@@ -1,0 +1,4 @@
+﻿  main.c
+c:\users\administrator\desktop\堆栈计算器github\calculator\main\main.c(4): warning C4083: 应输入“newline”；找到标识符“；”
+c:\users\administrator\desktop\堆栈计算器github\calculator\main\main.c(98): warning C4715: “panduan”: 不是所有的控件路径都返回值
+  main.vcxproj -> C:\Users\Administrator\Desktop\堆栈计算器github\calculator\main\Debug\main.exe
