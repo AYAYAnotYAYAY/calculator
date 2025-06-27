@@ -1,226 +1,256 @@
 #include <stdio.h>
 #include <math.h>
-#include <malloc.h>
-#pragma warning(disable:4996)；
-struct yuansu { char data; double num; struct yuansu *next; struct yuansu *father; };//定义一个链表结构的数据类型，用来做栈计算
+#include <stdlib.h>
+#include <string.h>
 
-struct yuansu *pop(struct yuansu *R)//出栈，返回next
-{
-	struct yuansu *temp;
-	temp = R->father;
-	free(R);
-	return temp;
+#pragma warning(disable:4996)
+
+// Define NAN if not available
+#ifndef NAN
+#define NAN (0.0/0.0)
+#endif
+
+// Structure for elements in the stack/list
+struct yuansu {
+    char data;
+    double num;
+    struct yuansu* next;
+    struct yuansu* father;
+};
+
+// Function to free the entire linked list to prevent memory leaks
+void free_list(struct yuansu* node) {
+    struct yuansu* tmp;
+    while (node != NULL) {
+        tmp = node;
+        node = node->next;
+        free(tmp);
+    }
 }
 
-struct yuansu *push(struct yuansu *zz, char a, double i)//入栈，返回新地址
-{
-	struct yuansu *temp;
-	temp = (struct yuansu*)malloc(sizeof(struct yuansu));
-	zz->next = temp;
-	temp->father = zz;
-	temp->next = NULL;
-	temp->num = i;
-	temp->data = a;
-	return temp;
-
+// Pop an element from the stack
+struct yuansu* pop(struct yuansu* R) {
+    if (R == NULL || R->father == NULL) { // Cannot pop the head sentinel
+        return R;
+    }
+    struct yuansu* temp = R->father;
+    temp->next = NULL;
+    free(R);
+    return temp;
 }
 
-double sum(struct yuansu *S)//提供后缀表达式链表，计算最终结果
-{
-	struct yuansu *H;//计算时用到的计算栈
-	H = (struct yuansu*)malloc(sizeof(struct yuansu));//初始化第一个地址
-	while (S != NULL)
-	{
-		if (S->data == ' ')//如果数据为空格则内容为数字
-		{
-			H = push(H, ' ', S->num);//操作数入计算栈
-		}
-		else//否则为运算符
-		{
-			double A, B;//运算数暂时变量
-			switch (S->data)
-			{
-			case '+': B = H->num; H = pop(H); A = H->num; H = pop(H); H = push(H, ' ', A + B); break;
-			case '-':B = H->num; H = pop(H); A = H->num; H = pop(H); H = push(H, ' ', A - B); break;
-			case '*':B = H->num; H = pop(H); A = H->num; H = pop(H); H = push(H, ' ', A * B); break;
-			case '/':B = H->num; H = pop(H); A = H->num; H = pop(H); H = push(H, ' ', A / B); break;
-			case '^':B = H->num; H = pop(H); A = H->num; H = pop(H); H = push(H, ' ', pow(A, B)); break;
-			}
-
-		}
-		S = S->next;
-	}
-
-	return H->num;
+// Push an element onto the stack
+struct yuansu* push(struct yuansu* zz, char a, double i) {
+    struct yuansu* temp = (struct yuansu*)malloc(sizeof(struct yuansu));
+    if (temp == NULL) {
+        printf("Error: Memory allocation failed.\n");
+        exit(1);
+    }
+    if (zz != NULL) {
+        zz->next = temp;
+    }
+    temp->father = zz;
+    temp->next = NULL;
+    temp->num = i;
+    temp->data = a;
+    return temp;
 }
 
-int panduan(struct yuansu *S, char suanshi)//比较提供的链表中的符号情况，决定参数符号是否应该直接入栈。应该直接入栈返回1，不应该返回0,如是右括号连续输出直到左括号为止返回2.
-{
+// Calculate the result from a postfix expression list
+double sum(struct yuansu* S) {
+    struct yuansu* H = push(NULL, '#', 0); // Use a temporary stack for calculation
 
-	if (suanshi == '+' || suanshi == '-')//如果参数符号为加减
-	{
-		if (S->data == '*' || S->data == '^' || S->data == '/')//如果加减前面是乘除
-		{
-			return 0;
-		}
-		else if (S->data == '(')//如果加减前面是左括号
-		{
-			return 1;
-		}
-		else
-		{
-			return 0;
-		}
-	}
-	else if (suanshi == '*' || suanshi == '/' || suanshi == '^')//如果参数是乘除次方
-	{
-		if (S->data == '+' || S->data == '-' || S->data == '(')//如果乘除前面是加减左括号
-		{
-			return 1;
-		}
-		else
-		{
-			return 0;
-		}
-	}
-	else if (suanshi == ')')
-	{
-		return 2;
-	}
-	else if (suanshi == '(')//如果是左括号，直接入栈
-	{
-		return 1;
-	}
-	else
-	{
-		printf("未知错误！！-判断\n");
-	}
+    struct yuansu* current = S;
+    while (current != NULL) {
+        if (current->data == ' ') { // If it's a number
+            H = push(H, ' ', current->num);
+        }
+        else { // If it's an operator
+            if (H == NULL || H->father == NULL || H->father->father == NULL) {
+                printf("Error: Invalid expression format (not enough operands)!\n");
+                free_list(H);
+                return NAN;
+            }
+            double B = H->num; H = pop(H);
+            double A = H->num; H = pop(H);
+
+            switch (current->data) {
+            case '+': H = push(H, ' ', A + B); break;
+            case '-': H = push(H, ' ', A - B); break;
+            case '*': H = push(H, ' ', A * B); break;
+            case '/':
+                if (B == 0) {
+                    printf("Error: Division by zero!\n");
+                    free_list(H);
+                    return NAN;
+                }
+                H = push(H, ' ', A / B); break;
+            case '^': H = push(H, ' ', pow(A, B)); break;
+            default:
+                printf("Unknown operator: %c\n", current->data);
+                free_list(H);
+                return NAN;
+            }
+        }
+        current = current->next;
+    }
+
+    if (H == NULL || H->father == NULL || H->father->father != NULL) {
+        printf("Error: Invalid expression format (too many operands)!\n");
+        free_list(H);
+        return NAN;
+    }
+
+    double result = H->num;
+    free_list(H);
+    return result;
 }
 
-struct yuansu *zhuanhuan(char suanshi[])//提供字符串类型的中缀表达式转换为双项链表结构的后缀表达式
-{
-	struct yuansu *F, *S, *r;
-	double h = 0;
-	F = (struct yuansu*)malloc(sizeof(struct yuansu));//正式后缀表达式链表
-	r = F;
-	F->father = NULL;
-	F->next = NULL;
-	S = (struct yuansu*)malloc(sizeof(struct yuansu));//运算符号堆栈链表
-	S->father = NULL;
-	while (*suanshi != '\0')//遍历整个字符串
-	{
-		if (*suanshi >= '0'&&*suanshi <= '9')//处理运算数字入F链表
-		{
-			int d = 0;
-			h += (*suanshi - '0');
-			suanshi++;
-			while (*suanshi == '.' || *suanshi >= '0'&&*suanshi <= '9')
-			{
-				if (*suanshi == '.'&&d == 0)
-				{
-					d++;
-				}
-				else
-				{
-					if (d == 0)
-					{
-						h = h * 10 + (*suanshi - '0');
-					}
-					else if (d > 0)
-					{
-						h += (*suanshi - '0') / (pow(10, d));
-						d++;
-					}
-				}
-				suanshi++;
-			}
-			F = push(F, ' ', h);
-			h = 0, d = 0;
-		}
-		else//处理运算符号入F链表
-		{
-			if (S->father == NULL)
-			{
+// Check operator precedence
+int panduan(struct yuansu* S, char suanshi) {
+    char top_op = S->data;
 
-				S = push(S, *suanshi, 0);
-			}
-			else
-			{
-				int jg;
-				jg = panduan(S, *suanshi);
-				if (jg == 1)
-				{
+    if (suanshi == '(') return 1; // Always push '('
 
-					S = push(S, *suanshi, 0);
-				}
-				else if (jg == 0)
-				{
+    if (suanshi == ')') return 2; // Handle ')'
 
-					F = push(F, S->data, 0);
-					S = pop(S);
-					S = push(S, *suanshi, 0);
-				}
-				else if (jg == 2)
-				{
+    int p1 = 0, p2 = 0; // Precedence levels
 
-					for (; S->data != '(';)
-					{
+    if (top_op == '+' || top_op == '-') p1 = 1;
+    else if (top_op == '*' || top_op == '/') p1 = 2;
+    else if (top_op == '^') p1 = 3;
+    else if (top_op == '(') p1 = 0; // '(' on stack has low precedence
 
-						F = push(F, S->data, 0);
-						S = pop(S);
-					}
+    if (suanshi == '+' || suanshi == '-') p2 = 1;
+    else if (suanshi == '*' || suanshi == '/') p2 = 2;
+    else if (suanshi == '^') p2 = 4; // Right-associative for '^
 
-					S = pop(S);
-				}
-				else
-				{
-					printf("未知错误！！！\n");
-				}
-			}
-			suanshi++;
-		}
-
-	}
-	while (S->father != NULL)
-	{
-		F = push(F, S->data, 0);
-		S = pop(S);
-	}
-	return r;
+    if (p2 > p1) {
+        return 1; // Push if incoming has higher precedence
+    }
+    else {
+        return 0; // Pop otherwise
+    }
 }
 
+// Convert infix string to postfix linked list
+struct yuansu* zhuanhuan(const char* suanshi) {
+    struct yuansu* F_head, * F_tail, * S_top;
+    char* p = (char*)suanshi;
+    char* end;
 
+    F_head = F_tail = push(NULL, '#', 0); // Postfix expression list
+    S_top = push(NULL, '#', 0);           // Operator stack
 
+    while (*p != '\0') {
+        if (*p >= '0' && *p <= '9' || *p == '.') {
+            double num = strtod(p, &end);
+            F_tail = push(F_tail, ' ', num);
+            p = end;
+            continue;
+        }
+        else if (*p == ' ') {
+            p++;
+            continue;
+        }
+        else if (strchr("+-*/^()", *p)) {
+            char op = *p;
+            if (op == '(') {
+                S_top = push(S_top, op, 0);
+            } else if (op == ')') {
+                while (S_top->data != '#' && S_top->data != '(') {
+                    F_tail = push(F_tail, S_top->data, 0);
+                    S_top = pop(S_top);
+                }
+                if (S_top->data == '(') {
+                    S_top = pop(S_top); // Pop '('
+                } else {
+                    printf("Error: Mismatched parentheses!\n");
+                    free_list(F_head);
+                    free_list(S_top);
+                    return NULL;
+                }
+            } else {
+                while (S_top->data != '#' && panduan(S_top, op) == 0) {
+                    F_tail = push(F_tail, S_top->data, 0);
+                    S_top = pop(S_top);
+                }
+                S_top = push(S_top, op, 0);
+            }
+            p++;
+        }
+        else {
+            printf("Unknown character in expression: %c\n", *p);
+            free_list(F_head);
+            free_list(S_top);
+            return NULL;
+        }
+    }
 
+    while (S_top->data != '#') {
+        if (S_top->data == '(') {
+            printf("Error: Mismatched parentheses!\n");
+            free_list(F_head);
+            free_list(S_top);
+            return NULL;
+        }
+        F_tail = push(F_tail, S_top->data, 0);
+        S_top = pop(S_top);
+    }
 
-int main()
-{
-	printf("科学计算器，请输入算式:\n");
-	char cm[80];
-	scanf("%s",&cm);
-	for (;;)
-	{
-		struct yuansu *p, *q;
-		p = zhuanhuan(cm);
-		p = p->next;
-		q = p;
-		printf("转换为后缀表达式：");
-		while (p != NULL)
-		{
-			if (p->data == ' ')
-			{
-				printf("%.4lf", p->num);
-				p = p->next;
-			}
-			else
-			{
-				printf("%c", p->data);
-				p = p->next;
-			}
-		}
+    free_list(S_top); // Free the operator stack
 
-		printf("\n计算结果：%lf\n", sum(q));
-		scanf("%s",&cm);
-	}
-	return 0;
+    struct yuansu* result_head = F_head->next;
+    if (result_head) result_head->father = NULL;
+    free(F_head); // Free the sentinel node
+    return result_head;
+}
+
+int main() {
+    printf("Scientific Calculator. Enter expression (or 'exit' to quit):\n");
+    char cm[1024];
+
+    while (fgets(cm, sizeof(cm), stdin)) {
+        // Remove newline character from fgets
+        cm[strcspn(cm, "\n")] = 0;
+
+        if (strcmp(cm, "exit") == 0) {
+            break;
+        }
+        
+        if (strlen(cm) == 0) {
+            continue;
+        }
+
+        struct yuansu* p, * q;
+        p = zhuanhuan(cm);
+        if (p == NULL) {
+            printf("Please enter a valid expression.\n> ");
+            continue;
+        }
+
+        q = p;
+        printf("Postfix: ");
+        while (p != NULL) {
+            if (p->data == ' ') {
+                printf("%.4g ", p->num);
+            }
+            else {
+                printf("%c ", p->data);
+            }
+            p = p->next;
+        }
+        printf("\n");
+
+        double result = sum(q);
+        if (!isnan(result)) {
+            printf("Result: %.4g\n", result);
+        }
+
+        free_list(q); // Free the memory for the current expression
+
+        printf("> ");
+    }
+    printf("Exiting calculator.\n");
+    return 0;
 }
